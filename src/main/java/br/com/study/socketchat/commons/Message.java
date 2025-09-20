@@ -2,6 +2,7 @@ package br.com.study.socketchat.commons;
 
 import br.com.study.socketchat.commons.enums.MessageType;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.io.Serializable;
 import java.time.LocalDateTime;
@@ -11,6 +12,7 @@ import java.time.LocalDateTime;
  * Implementa Serializable para permitir transmissão via socket
  */
 @Data
+@NoArgsConstructor
 public class Message implements Serializable {
     private MessageType type;
     private String from;
