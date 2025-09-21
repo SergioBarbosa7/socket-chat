@@ -42,7 +42,7 @@ public class ChatService {
      */
     public void sendGroupMessage(Message message, ChatHandler sender) {
         String groupName = message.getTo();
-        Group group = groupService.findGroupWithUser(message.getFrom(), groupName);
+        Group group = groupService.findGroupWithUser(groupName, message.getFrom());
 
         if (group == null) {
             sender.sendGenericMessage(buildErrorMessage(message, "Grupo não existe: " + groupName));

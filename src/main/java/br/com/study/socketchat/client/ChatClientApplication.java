@@ -329,14 +329,12 @@ public class ChatClientApplication {
             case GROUP_LEFT:
             case GROUPS_LIST:
             case USERS_LIST:
+            case FILE_RECEIVED:
                 printGenericMessage(message);
                 break;
             case FILE_MESSAGE:
             case FILE_GROUP:
                 handleIncomingFile(message);
-                break;
-            case FILE_RECEIVED:
-                printGenericMessage(message);
                 break;
             case GROUP_LEAVE_FAILED:
             case GROUP_JOIN_FAILED:
