@@ -9,6 +9,8 @@ import br.com.study.socketchat.server.service.ChatService;
 import br.com.study.socketchat.server.session.SessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Scope;
+import org.springframework.stereotype.Component;
 
 import java.io.*;
 import java.net.Socket;
@@ -19,11 +21,13 @@ import java.util.List;
  * Handler para gerenciar a comunicação com um cliente específico
  * Cada cliente conectado tem sua própria thread com este handler
  */
+@Component
+@Scope("prototype")
 public class ChatHandler implements Runnable {
     private static final Logger LOG = LoggerFactory.getLogger(ChatHandler.class);
     private static final String SERVER_USER = "SERVER";
 
-    private final Socket clientSocket;
+    private Socket clientSocket;
     private final SessionManager sessionManager;
     private final ChatService chatService;
     private final GroupService groupService;
@@ -32,15 +36,26 @@ public class ChatHandler implements Runnable {
     private String username;
     private boolean isConnected = true;
 
-    public ChatHandler(Socket clientSocket, SessionManager sessionManager, ChatService chatService, GroupService groupService) {
-        this.clientSocket = clientSocket;
+    public ChatHandler(SessionManager sessionManager, ChatService chatService, GroupService groupService) {
         this.sessionManager = sessionManager;
         this.chatService = chatService;
         this.groupService = groupService;
     }
 
+    public ChatHandler initialize(Socket clientSocket) {
+        this.clientSocket = clientSocket;
+        this.username = null;
+        this.isConnected = true;
+        this.inputStream = null;
+        this.outputStream = null;
+        return this;
+    }
+
     @Override
     public void run() {
+        if (clientSocket == null) {
+            throw new IllegalStateException("ChatHandler needs to be initialized with a client socket");
+        }
         try {
             outputStream = new ObjectOutputStream(clientSocket.getOutputStream());
             inputStream = new ObjectInputStream(clientSocket.getInputStream());

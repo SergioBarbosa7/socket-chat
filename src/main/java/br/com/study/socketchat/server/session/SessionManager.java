@@ -4,12 +4,14 @@ import br.com.study.socketchat.commons.User;
 import br.com.study.socketchat.server.ChatHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Component
 public class SessionManager {
     private static final Logger LOG = LoggerFactory.getLogger(SessionManager.class);
 

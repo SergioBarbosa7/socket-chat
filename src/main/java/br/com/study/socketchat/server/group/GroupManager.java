@@ -1,12 +1,14 @@
 package br.com.study.socketchat.server.group;
 
 import br.com.study.socketchat.commons.Group;
+import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@Component
 public class GroupManager {
     private Map<String, Group> groups;
 
