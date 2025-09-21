@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile.server
+    ports:
+      - "12345:12345"
+    networks:
+      - chat-net
+
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    environment:
+      CHAT_SERVER_HOST: server
+      CHAT_SERVER_PORT: 12345
+    stdin_open: true
+    tty: true
+    depends_on:
+      - server
+    networks:
+      - chat-net
+
+networks:
+  chat-net:
+    driver: bridge

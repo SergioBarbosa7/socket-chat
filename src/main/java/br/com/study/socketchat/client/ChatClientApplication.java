@@ -20,8 +20,8 @@ import java.util.concurrent.Executors;
  */
 @SpringBootApplication
 public class ChatClientApplication {
-    private static final String SERVER_HOST = "localhost";
-    private static final int SERVER_PORT = 12345;
+    private static final String SERVER_HOST = resolveServerHost();
+    private static final int SERVER_PORT = resolveServerPort();
     private static final String DOWNLOADS_DIRECTORY = "client_downloads/";
 
     private Socket socket;
@@ -36,6 +36,40 @@ public class ChatClientApplication {
         this.executor = Executors.newSingleThreadExecutor();
         this.scanner = new Scanner(System.in);
         createDownloadsDirectory();
+    }
+
+    private static String resolveServerHost() {
+        String env = System.getenv("CHAT_SERVER_HOST");
+        if (env != null && !env.isBlank()) {
+            return env.trim();
+        }
+        String property = System.getProperty("chat.server.host");
+        if (property != null && !property.isBlank()) {
+            return property.trim();
+        }
+        return "localhost";
+    }
+
+    private static int resolveServerPort() {
+        String env = System.getenv("CHAT_SERVER_PORT");
+        if (env != null && !env.isBlank()) {
+            try {
+                return Integer.parseInt(env.trim());
+            } catch (NumberFormatException ex) {
+                System.out.println("CHAT_SERVER_PORT inválida: " + env + ". Usando porta padrão 12345.");
+            }
+        }
+
+        String property = System.getProperty("chat.server.port");
+        if (property != null && !property.isBlank()) {
+            try {
+                return Integer.parseInt(property.trim());
+            } catch (NumberFormatException ex) {
+                System.out.println("Propriedade chat.server.port inválida: " + property + ". Usando porta padrão 12345.");
+            }
+        }
+
+        return 12345;
     }
 
     private void createDownloadsDirectory() {
