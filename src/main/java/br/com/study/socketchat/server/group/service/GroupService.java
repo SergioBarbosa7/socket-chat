@@ -2,9 +2,11 @@ package br.com.study.socketchat.server.group.service;
 
 import br.com.study.socketchat.commons.Group;
 import br.com.study.socketchat.server.group.GroupManager;
+import org.springframework.stereotype.Service;
 
 import java.util.List;
 
+@Service
 public class GroupService {
     private final GroupManager groupManager;
 

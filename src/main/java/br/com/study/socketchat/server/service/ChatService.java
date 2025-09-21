@@ -9,6 +9,7 @@ import br.com.study.socketchat.server.storage.OfflineMessageStorage;
 import br.com.study.socketchat.server.session.SessionManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
 
 import java.util.Set;
 
@@ -16,6 +17,7 @@ import java.util.Set;
  * Serviço responsável pela lógica de envio de mensagens.
  * Aplica regras de negócio do chat (online/offline, entrega, erro).
  */
+@Service
 public class ChatService {
     private static final Logger LOG = LoggerFactory.getLogger(ChatService.class);
     private static final String SERVER_USER = "SERVER";
@@ -42,7 +44,7 @@ public class ChatService {
      */
     public void sendGroupMessage(Message message, ChatHandler sender) {
         String groupName = message.getTo();
-        Group group = groupService.findGroupWithUser(message.getFrom(), groupName);
+        Group group = groupService.findGroupWithUser(groupName, message.getFrom());
 
         if (group == null) {
             sender.sendGenericMessage(buildErrorMessage(message, "Grupo não existe: " + groupName));

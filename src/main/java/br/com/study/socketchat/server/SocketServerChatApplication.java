@@ -1,18 +1,19 @@
 package br.com.study.socketchat.server;
 
-
-import br.com.study.socketchat.server.group.GroupManager;
 import br.com.study.socketchat.server.group.service.GroupService;
 import br.com.study.socketchat.server.service.ChatService;
 import br.com.study.socketchat.server.session.SessionManager;
-import br.com.study.socketchat.server.storage.OfflineMessageStorage;
-import br.com.study.socketchat.server.storage.impl.OfflineMessageStorageImpl;
+import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-import java.io.*;
-import java.net.*;
+import java.io.File;
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -21,85 +22,97 @@ import java.util.concurrent.Executors;
  * Suporta mensagens privadas, grupos e envio de arquivos
  */
 @SpringBootApplication
-public class SocketServerChatApplication {
+public class SocketServerChatApplication implements CommandLineRunner {
 
     private static final int PORT = 12345;
     private static final String FILES_DIRECTORY = "server_files/";
 
-    private ServerSocket serverSocket;
-    private boolean isRunning = false;
-    private ExecutorService threadPool;
-    
-    private final OfflineMessageStorage offlineMessageStorage;
+    private static final Logger LOG = LoggerFactory.getLogger(SocketServerChatApplication.class);
+
     private final SessionManager sessionManager;
     private final ChatService chatService;
-    private final GroupManager groupManager;
     private final GroupService groupService;
+    private final ChatHandlerFactory chatHandlerFactory;
+    private final ExecutorService threadPool = Executors.newCachedThreadPool();
 
+    private ServerSocket serverSocket;
+    private boolean isRunning = false;
 
-    public SocketServerChatApplication() {
-        this.threadPool = Executors.newCachedThreadPool();
-        this.sessionManager = new SessionManager();
-        this.offlineMessageStorage = new OfflineMessageStorageImpl();
-        this.groupManager =  new GroupManager();
-        this.groupService = new GroupService(groupManager);
-        this.chatService = new ChatService(sessionManager, groupService, offlineMessageStorage);
-
+    public SocketServerChatApplication(SessionManager sessionManager,
+                                       ChatService chatService,
+                                       GroupService groupService,
+                                       ChatHandlerFactory chatHandlerFactory) {
+        this.sessionManager = sessionManager;
+        this.chatService = chatService;
+        this.groupService = groupService;
+        this.chatHandlerFactory = chatHandlerFactory;
         createFilesDirectory();
     }
-    
+
     private void createFilesDirectory() {
         File dir = new File(FILES_DIRECTORY);
         if (!dir.exists()) {
-            dir.mkdirs();
+            boolean created = dir.mkdirs();
+            if (created) {
+                LOG.info("Diretório de arquivos criado em {}", dir.getAbsolutePath());
+            }
         }
     }
-    
+
+    @Override
+    public void run(String... args) {
+        LOG.info("Dependências carregadas: SessionManager={}, GroupService={}, ChatService={}",
+                sessionManager.getClass().getSimpleName(),
+                groupService.getClass().getSimpleName(),
+                chatService.getClass().getSimpleName());
+        start();
+    }
+
     public void start() {
         try {
             serverSocket = new ServerSocket(PORT);
             isRunning = true;
-            System.out.println("Servidor iniciado na porta " + PORT);
-            System.out.println("Diretório de arquivos: " + FILES_DIRECTORY);
-            
+            LOG.info("Servidor iniciado na porta {}", PORT);
+            LOG.info("Diretório de arquivos: {}", FILES_DIRECTORY);
+
             while (isRunning) {
                 try {
                     Socket clientSocket = serverSocket.accept();
-                    System.out.println("🔗 Nova conexão recebida: " + clientSocket.getInetAddress());
+                    LOG.info("🔗 Nova conexão recebida: {}", clientSocket.getInetAddress());
 
-                    ChatHandler clientHandler = new ChatHandler(clientSocket, sessionManager, chatService, groupService);
+                    ChatHandler clientHandler = chatHandlerFactory.create(clientSocket);
                     threadPool.execute(clientHandler);
-                    
+
                 } catch (IOException e) {
                     if (isRunning) {
-                        System.err.println("Erro ao aceitar conexão: " + e.getMessage());
+                        LOG.error("Erro ao aceitar conexão", e);
                     }
                 }
             }
         } catch (IOException e) {
-            System.err.println("Erro ao iniciar servidor: " + e.getMessage());
+            LOG.error("Erro ao iniciar servidor", e);
         }
     }
-    
+
+    @PreDestroy
+    public void onDestroy() {
+        stop();
+    }
+
     public void stop() {
         isRunning = false;
         try {
-            if (serverSocket != null) {
+            if (serverSocket != null && !serverSocket.isClosed()) {
                 serverSocket.close();
             }
             threadPool.shutdown();
-            System.out.println("Servidor parado");
+            LOG.info("Servidor parado");
         } catch (IOException e) {
-            System.err.println("Erro ao parar servidor: " + e.getMessage());
+            LOG.error("Erro ao parar servidor", e);
         }
     }
 
     public static void main(String[] args) {
-        SocketServerChatApplication server = new SocketServerChatApplication();
-        
-        Runtime.getRuntime().addShutdownHook(new Thread(server::stop));
-        
-        server.start();
+        SpringApplication.run(SocketServerChatApplication.class, args);
     }
 }
-
