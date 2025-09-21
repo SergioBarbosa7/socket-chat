@@ -117,6 +117,9 @@ public class ChatHandler implements Runnable {
                 leaveGroup(message);
                 break;
             case FILE_MESSAGE:
+            case FILE_GROUP:
+                sendFile(message);
+                break;
             case REQUEST_GROUPS_LIST:
                 listGroups();
                 break;
@@ -199,6 +202,19 @@ public class ChatHandler implements Runnable {
     private void sendPrivateMessage(Message message) {
         try {
             chatService.sendPrivateMessage(message, this);
+        } catch (IllegalArgumentException iae) {
+            sendGenericMessage(buildErrorMessage(MessageType.ERROR_MESSAGE, iae.getMessage()));
+        }
+
+    }
+
+    private void sendFile(Message message) {
+        try {
+            if (message.getType() == MessageType.FILE_GROUP) {
+                chatService.sendGroupMessage(message, this);
+            } else {
+                chatService.sendPrivateMessage(message, this);
+            }
         } catch (IllegalArgumentException iae) {
             sendGenericMessage(buildErrorMessage(MessageType.ERROR_MESSAGE, iae.getMessage()));
         }

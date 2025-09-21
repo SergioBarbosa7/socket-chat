@@ -4,10 +4,12 @@ import br.com.study.socketchat.commons.Message;
 import br.com.study.socketchat.commons.enums.MessageType;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
-import java.io.*;
-import java.net.Socket;
 import java.net.ConnectException;
+import java.net.Socket;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.io.*;
 import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -191,6 +193,12 @@ public class ChatClientApplication {
                 }
                 break;
             case "/file":
+                if (parts.length == 3) {
+                    sendFile(parts[1], parts[2]);
+                } else {
+                    System.out.println("ERR: Uso Indevido, correto: /file <destino> <arquivo>");
+                }
+                break;
             case "/groups":
                 listGroups();
                 break;
@@ -263,6 +271,35 @@ public class ChatClientApplication {
         }
     }
 
+    private void sendFile(String destination, String filePath) {
+        File file = new File(filePath);
+        if (!file.exists() || !file.isFile()) {
+            System.out.println("Arquivo não encontrado: " + filePath);
+            return;
+        }
+
+        String target = destination;
+        MessageType messageType = MessageType.FILE_MESSAGE;
+
+        if (destination.startsWith("#")) {
+            target = destination.substring(1);
+            if (target.isBlank()) {
+                System.out.println("ERR: Nome de grupo inválido.");
+                return;
+            }
+            messageType = MessageType.FILE_GROUP;
+        }
+
+        try {
+            byte[] fileBytes = Files.readAllBytes(file.toPath());
+            Message message = new Message(messageType, username, target, fileBytes, file.getName());
+            sendGenericMessage(message);
+            System.out.println("Arquivo \"" + file.getName() + "\" enviado para " + destination + ".");
+        } catch (IOException e) {
+            System.out.println("Erro ao enviar arquivo: " + e.getMessage());
+        }
+    }
+
 
     private void printHelp() {
         System.out.println("\nCOMANDOS DISPONÍVEIS:");
@@ -295,6 +332,11 @@ public class ChatClientApplication {
                 printGenericMessage(message);
                 break;
             case FILE_MESSAGE:
+            case FILE_GROUP:
+                handleIncomingFile(message);
+                break;
+            case FILE_RECEIVED:
+                printGenericMessage(message);
                 break;
             case GROUP_LEAVE_FAILED:
             case GROUP_JOIN_FAILED:
@@ -325,6 +367,56 @@ public class ChatClientApplication {
     public void sendGenericMessage(Message message) throws IOException {
         outputStream.writeObject(message);
         outputStream.flush();
+    }
+
+    private void handleIncomingFile(Message message) {
+        String sender = message.getFrom();
+        String originalFileName = message.getFileName();
+        if (originalFileName == null || originalFileName.isBlank()) {
+            originalFileName = "arquivo_recebido";
+        }
+
+        byte[] fileData;
+        try {
+            fileData = message.getFileData();
+        } catch (IllegalArgumentException e) {
+            System.out.println("\nErro ao decodificar arquivo recebido de " + sender + ": " + e.getMessage());
+            return;
+        }
+
+        Path downloadsPath = Paths.get(DOWNLOADS_DIRECTORY);
+        Path targetPath = resolveFilePath(downloadsPath, originalFileName);
+
+        try {
+            Files.createDirectories(downloadsPath);
+            Files.write(targetPath, fileData);
+            System.out.println("\nArquivo recebido de " + sender + ": " + targetPath.getFileName() + " (" + fileData.length + " bytes)");
+            System.out.println("Salvo em: " + targetPath.toAbsolutePath());
+        } catch (IOException e) {
+            System.out.println("\nErro ao salvar arquivo recebido de " + sender + ": " + e.getMessage());
+        }
+    }
+
+    private Path resolveFilePath(Path directory, String fileName) {
+        Path candidate = directory.resolve(fileName);
+        if (!Files.exists(candidate)) {
+            return candidate;
+        }
+
+        String baseName = fileName;
+        String extension = "";
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex > 0) {
+            baseName = fileName.substring(0, dotIndex);
+            extension = fileName.substring(dotIndex);
+        }
+
+        int counter = 1;
+        while (Files.exists(candidate)) {
+            candidate = directory.resolve(baseName + "(" + counter++ + ")" + extension);
+        }
+
+        return candidate;
     }
 
     private void disconnect() {
