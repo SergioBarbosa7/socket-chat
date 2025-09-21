@@ -27,6 +27,7 @@ public enum MessageType {
 
     // Arquivos
     FILE_MESSAGE,
+    FILE_GROUP,
     FILE_RECEIVED,
 
     // Informações do servidor

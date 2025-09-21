@@ -7,6 +7,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import java.io.*;
 import java.net.Socket;
 import java.net.ConnectException;
+import java.nio.file.Files;
 import java.util.Scanner;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -74,7 +75,8 @@ public class ChatClientApplication {
             }
         } catch (IOException | ClassNotFoundException e) {
             if (isConnected) {
-                System.out.println("\n Conexão perdida com o servidor");
+                System.out.println("\n Conexão perdida com o servidor" + e.getMessage());
+                e.printStackTrace();
                 isConnected = false;
             }
         }
@@ -142,27 +144,125 @@ public class ChatClientApplication {
         String command = parts[0].toLowerCase();
 
         switch (command) {
+            case "/quit":
+            case "/exit":
+                disconnect();
+                break;
             case "/help":
             case "/h":
                 printHelp();
                 break;
             case "/msg":
-            case "/group":
-            case "/create":
-            case "/join":
-            case "/leave":
-            case "/file":
-            case "/users":
-            case "/groups":
-            case "/quit":
-            case "/exit":
-                disconnect();
+                if (parts.length == 3) {
+                    sendPrivateMessage(parts[1], parts[2]);
+                } else {
+                    System.out.println("ERR: Uso Indevido, correto: /msg <usuário> <mensagem>");
+                }
                 break;
-
+            case "/users":
+                listUsers();
+                break;
+            case "/group":
+                if (parts.length == 3) {
+                    sendGroupMessage(parts[1], parts[2]);
+                } else {
+                    System.out.println("ERR: Uso Indevido, correto: /group <grupo> <mensagem>");
+                }
+                break;
+            case "/create":
+                if (parts.length == 2) {
+                    createGroup(parts[1]);
+                } else {
+                    System.out.println("ERR: Uso Indevido, correto: /create <grupo>");
+                }
+                break;
+            case "/join":
+                if (parts.length == 2) {
+                    joinGroup(parts[1]);
+                } else {
+                    System.out.println("ERR: Uso Indevido, correto: /join <grupo>");
+                }
+                break;
+            case "/leave":
+                if (parts.length == 2) {
+                    leaveGroup(parts[1]);
+                } else {
+                    System.out.println("ERR: Uso Indevido, correto: /join <grupo>");
+                }
+                break;
+            case "/file":
+            case "/groups":
+                listGroups();
+                break;
             default:
                 System.out.println("Comando não reconhecido. Digite /help para ver os comandos disponíveis.");
         }
     }
+
+    private void sendGroupMessage(String groupName, String content) {
+        try {
+            Message message = new Message(MessageType.GROUP_MESSAGE, username, groupName, content);
+            sendGenericMessage(message);
+        } catch (IOException e) {
+            System.out.println("Erro ao criar grupo: " + e.getMessage());
+        }
+    }
+
+    private void leaveGroup(String groupName) {
+        try {
+            Message message = new Message(MessageType.LEAVE_GROUP, username, null, groupName);
+            sendGenericMessage(message);
+        } catch (IOException e) {
+            System.out.println("Erro ao criar grupo: " + e.getMessage());
+        }
+    }
+
+    private void listGroups() {
+        try {
+            Message message = new Message(MessageType.REQUEST_GROUPS_LIST, username, null, null);
+            sendGenericMessage(message);
+        } catch (IOException e) {
+            System.out.println("Erro ao requisitar usuarios: " + e.getMessage());
+        }
+    }
+
+
+    private void createGroup(String groupName) {
+        try {
+            Message message = new Message(MessageType.CREATE_GROUP, username, null, groupName);
+            sendGenericMessage(message);
+        } catch (IOException e) {
+            System.out.println("Erro ao criar grupo: " + e.getMessage());
+        }
+    }
+
+    private void joinGroup(String groupName) {
+        try {
+            Message message = new Message(MessageType.JOIN_GROUP, username, null, groupName);
+            sendGenericMessage(message);
+        } catch (IOException e) {
+            System.out.println("Erro ao entrar em grupo: " + e.getMessage());
+        }
+    }
+
+    private void listUsers() {
+        try {
+            Message message = new Message(MessageType.REQUEST_USERS_LIST, username, null, null);
+            sendGenericMessage(message);
+        } catch (IOException e) {
+            System.out.println("Erro ao requisitar usuarios: " + e.getMessage());
+        }
+    }
+
+    private void sendPrivateMessage(String to, String content) {
+        try {
+            Message message = new Message(MessageType.PRIVATE_MESSAGE, username, to, content);
+            sendGenericMessage(message);
+        } catch (IOException e) {
+            System.out.println("Erro ao enviar mensagem: " + e.getMessage());
+        }
+    }
+
 
     private void printHelp() {
         System.out.println("\nCOMANDOS DISPONÍVEIS:");
@@ -185,21 +285,46 @@ public class ChatClientApplication {
         switch (message.getType()) {
             case PRIVATE_MESSAGE:
             case GROUP_MESSAGE:
-            case FILE_MESSAGE:
-            case USERS_LIST:
-            case GROUPS_LIST:
+                printReceivedMessage(message);
+                break;
             case GROUP_CREATED:
             case GROUP_JOINED:
             case GROUP_LEFT:
-            case GROUP_CREATE_FAILED:
-            case GROUP_JOIN_FAILED:
+            case GROUPS_LIST:
+            case USERS_LIST:
+                printGenericMessage(message);
+                break;
+            case FILE_MESSAGE:
+                break;
             case GROUP_LEAVE_FAILED:
+            case GROUP_JOIN_FAILED:
+            case GROUP_CREATE_FAILED:
+            case ERROR_MESSAGE:
+                printErrorMessage(message);
+                break;
             default:
                 System.out.println("\n[SERVIDOR] " + message.getContent());
         }
 
         // Reexibir prompt
         System.out.print(username + "> ");
+    }
+
+    private void printGenericMessage(Message message) {
+        System.out.println(message.getContent());
+    }
+
+    private void printReceivedMessage(Message message) {
+        System.out.println(message.getFrom() + "(" + message.getTimestamp() + "): " + message.getContent());
+    }
+
+    private void printErrorMessage(Message message) {
+        System.out.println("ERROR(" + message.getType() +"): " + message.getContent());
+    }
+
+    public void sendGenericMessage(Message message) throws IOException {
+        outputStream.writeObject(message);
+        outputStream.flush();
     }
 
     private void disconnect() {
